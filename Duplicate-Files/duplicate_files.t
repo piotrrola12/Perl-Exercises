@@ -22,10 +22,10 @@ my @expected = (
 		"$Bin/DirTestB/file_test_1.txt",
 	],
 	[
-		"$Bin/DirTestA/file_test_3.txt",
 		"$Bin/DirTestA/file_test_2.txt",
-		"$Bin/DirTestB/file_test_3.txt",
-		"$Bin/DirTestB/file_test_2.txt",	
+		"$Bin/DirTestA/file_test_3.txt",
+		"$Bin/DirTestB/file_test_2.txt",
+		"$Bin/DirTestB/file_test_3.txt",	
 	]
 );
 
