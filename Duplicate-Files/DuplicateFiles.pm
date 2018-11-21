@@ -5,6 +5,8 @@ use Try::Tiny;
 use File::Find;
 use Digest::MD5;
 use Exporter;
+use FindBin qw($Bin);
+use Storable qw(retrieve nstore);
 
 @ISA = qw(Exporter);
 
@@ -24,26 +26,34 @@ Return:
 	
 =cut
 
-sub get_md5_files(@) {
-	my $files_array_ref = shift;
-
-	my %md5 = ();
-	
-	foreach my $file ( @{$files_array_ref} ) {
-		try {
-			open( my $fh, '<', $file ) or warn "Can't open '$file': $!" && next;
-			binmode($fh);
-
-			push @{ $md5{ Digest::MD5->new->addfile($fh)->hexdigest } }, $file;
-			close($fh);
-		}
-		catch {
-			warn "Caught error: $_";
-		}
-	}
-	
-	return %md5;
-}
+#sub get_md5_files(@) {
+#	my $files_array_ref = shift;
+#
+#	my %md5 = ();
+#
+#	foreach my $file ( @{$files_array_ref} ) {
+#		try {
+#			if ( defined $buffer_memory_file->{$file} ) {
+#				push @{ $md5{ $buffer_memory_file->{$file} } }, $file;
+#			}
+#			else {
+#
+#				open( my $fh, '<', $file )
+#				  or warn "Can't open '$file': $!" && next;
+#				binmode($fh);
+#
+#				push @{ $md5{ Digest::MD5->new->addfile($fh)->hexdigest } },
+#				  $file;
+#				close($fh);
+#			}
+#		}
+#		catch {
+#			warn "Caught error: $_";
+#		}
+#	}
+#
+#	return %md5;
+#}
 
 sub get_files_by_size(@) {
 	my @dir_list = @_;
@@ -58,11 +68,12 @@ sub get_files_by_size(@) {
 		},
 		@dir_list
 	);
-	
+
 	return %files;
 }
 
 sub find_dups(@) {
+
 	# Directories to search
 	my @dir_list = @_;
 
@@ -76,12 +87,42 @@ sub find_dups(@) {
 	# Resulting list
 	my @result = ();
 
+	my $memory_file  = "$Bin/.memory_file.info";
+	my $memory_file_hashref;
+	
+	if (-f $memory_file) {
+		$memory_file_hashref = retrieve($memory_file);
+	}
+	
 	foreach my $size ( keys %files ) {
 		if ( $#{ $files{$size} } < 1 ) {
 			next;
 		}
 		
-		my %md5 = get_md5_files( $files{$size} );
+		my %md5 = ();
+
+		foreach my $file ( @{$files{$size}} ) {
+			try {
+				if ( $memory_file_hashref->{$file} ) {
+					push @{ $md5{ $memory_file_hashref->{$file} } }, $file;
+				}
+				else {
+					open( my $fh, '<', $file ) or warn "Can't open '$file': $!" && next;
+					binmode($fh);
+					
+					my $hash = Digest::MD5->new->addfile($fh)->hexdigest;
+
+					push @{ $md5{$hash} }, $file;
+					
+					# save data to buffer memory file
+					$memory_file_hashref->{$file} = $hash;
+					close($fh);
+				}
+			}
+			catch {
+				warn "Caught error: $_";
+			}
+		}
 
 		# Check if any MD5 hash repeated
 		foreach my $hash ( keys %md5 ) {
@@ -92,6 +133,7 @@ sub find_dups(@) {
 		}
 	}
 	
+	nstore($memory_file_hashref, $memory_file); 
 	return @result;
 }
 
